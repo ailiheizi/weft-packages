@@ -1,40 +1,30 @@
-# Additive hooks v2
+# Additive product packages
 
-## Decision
+## One package is one product
 
-Weft packages are independently versioned modules. A package update is a verified replacement of one named module. It is not a dependency-resolution event.
+A Weft package is a product. It lives in a normal directory and can be changed directly. Weft core does not download it, compare versions, verify artifacts, switch sources, resolve dependencies, or build a registry.
 
-Modules extend products through named hooks. A hook is an explicit, versioned contract owned by the base module or core. Extensions may add a handler before, after, or around a hook. They may not replace a module, mutate another module on disk, or implicitly install a dependency.
+A product can expose hooks. Small companion packages can add behavior only through those hooks.
 
-## Runtime contract
+## Layout
 
-Core exposes a small HookHost:
-- list hook contracts and hook API versions
-- load a base module
-- attach ordered handlers to declared hooks
-- invoke hooks with typed input and output
-- reject unknown hooks and incompatible hook API versions
+A product keeps its own additions next to itself:
 
-A module declares its identity, version, runtime, capabilities, and optional exported hooks. An overlay declares its target module, target hook API range, handlers, and explicit order. Capability names remain runtime routing identifiers only; they are not install dependencies.
+products/my-product/
+  package.toml
+  package.wasm
+  addons/my-change/
+    package.toml
+    package.wasm
 
-## Profile and update
+To change a product, edit or replace its directory. To add behavior, add one directory below addons. Removing that directory removes the addition.
 
-A profile is the complete desired module set. It contains package id, immutable version, artifact URL, sha256, and core compatibility. Overlays are listed explicitly and ordered explicitly.
+## Minimal manifest idea
 
-Update flow:
-1. Fetch one signed or checksummed catalog.
-2. Compare the selected profile entries with available releases.
-3. Validate core and hook API compatibility.
-4. Download and verify each selected artifact.
-5. Stage the full profile, validate manifests, then atomically activate it.
-6. Reload or restart the affected runtime.
+A product declares the hook names it exports. An add-on declares the product it belongs to, one hook name, a phase (before, around, or after), and its entry. A hook name includes its contract generation, such as my_product.turn.before_tools.v1. A breaking product change uses a new hook name.
 
-No transitive dependency solver, multi-registry merge, source precedence, package discovery priority, or automatic dependency installation is part of v2.
+There is no version matching language, dependency list, priority list, profile, catalog, checksum, package store, or package update protocol.
 
-## Compatibility
+## Core responsibility
 
-Stable hook ids use a versioned namespace, such as core.chat.before_request.v1 or weft_claw.turn.after_tools.v1. Breaking a hook contract creates a new hook id. Updating a base package cannot silently reinterpret an existing overlay.
-
-## Migration
-
-Existing package.toml files remain source-compatible during migration through an adapter. Existing requires and provides metadata is retained for diagnostics, but requires no longer causes installation or version resolution. The legacy manager remains preserved in the legacy branches of weft and weft-core.
+Core loads the selected product and its local add-ons, rejects an add-on that targets a hook the product did not export, and dispatches valid add-ons in stable package-name order. Everything else belongs to normal source control and normal product development.
